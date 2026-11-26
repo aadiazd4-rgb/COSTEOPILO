@@ -14,10 +14,32 @@
     .input-cell:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,0.15); }
     .section-card { background: #ffffff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); border: 1px solid #e2e8f0; overflow: hidden; }
     .num-right { text-align: right; font-variant-numeric: tabular-nums; }
-    ::-webkit-scrollbar { width: 7px; height: 7px; }
-    ::-webkit-scrollbar-track { background: #f1f5f9; }
-    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+    /* Estilos exclusivos para impresión / exportación PDF */
+    @media print {
+      body * { visibility: hidden; }
+      #printPreviewModal, #printPreviewModal * { visibility: visible; }
+      #printPreviewModal {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        background: #ffffff !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        overflow: visible !important;
+      }
+      #printModalHeader { display: none !important; }
+      #printDocumentArea {
+        box-shadow: none !important;
+        border: none !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        padding: 10mm !important;
+        margin: 0 !important;
+      }
+      @page { size: A4 portrait; margin: 10mm; }
+    }
   </style>
 </head>
 <body class="text-slate-800 antialiased">
@@ -35,18 +57,20 @@
         </div>
       </div>
 
-      <div class="flex items-center gap-2 text-xs">
+      <div class="flex flex-wrap items-center gap-2 text-xs">
         <span id="driveStatusBadge" class="px-3 py-1.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300 flex items-center gap-2">
           <span class="w-2 h-2 rounded-full bg-amber-400" id="driveStatusDot"></span>
           <span id="driveStatusText">Google Sheets: Modo Local</span>
         </span>
+        <button onclick="abrirVistaImpresionPDF()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 shadow-sm">
+          <i class="fa-solid fa-file-pdf"></i> Vista PDF / Imprimir
+        </button>
         <button onclick="exportCosteoCSV()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 shadow-sm">
           <i class="fa-solid fa-file-csv"></i> Exportar CSV
         </button>
       </div>
     </div>
 
-    <!-- Navegación Principal -->
     <nav class="bg-white text-slate-600 border-b border-slate-200 shadow-sm">
       <div class="max-w-7xl mx-auto px-4 flex overflow-x-auto gap-1">
         <button onclick="switchMainTab('cotizador')" id="nav-cotizador" class="tab-active px-4 py-3 text-sm whitespace-nowrap flex items-center gap-2 transition">
@@ -65,7 +89,6 @@
     </nav>
   </header>
 
-  <!-- Notificación Toast -->
   <div id="toast" class="fixed bottom-5 right-5 z-50 hidden transform transition-all duration-300">
     <div class="bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl border border-slate-700 flex items-center gap-3 text-sm">
       <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400 text-lg"></i>
@@ -74,9 +97,8 @@
   </div>
 
   <main class="max-w-7xl mx-auto px-4 py-6">
-
     <!-- ===================================================================== -->
-    <!-- PESTAÑA 1: COTIZADOR (HOJA COSTEO INDUSTRIAL)                         -->
+    <!-- PESTAÑA 1: COTIZADOR                                                  -->
     <!-- ===================================================================== -->
     <section id="tab-cotizador" class="space-y-6">
       
@@ -86,7 +108,10 @@
           <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
             <i class="fa-solid fa-clipboard-list text-blue-600"></i> COSTEO Y CHECKLIST PACK-IND-O&G
           </h2>
-          <div class="flex gap-2">
+          <div class="flex flex-wrap gap-2">
+            <button onclick="abrirVistaImpresionPDF()" class="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-semibold px-3 py-1.5 rounded-lg transition">
+              <i class="fa-solid fa-print mr-1"></i> Vista Previa PDF
+            </button>
             <button onclick="cargarEjemploCosteo()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-3 py-1.5 rounded-lg transition">
               <i class="fa-solid fa-wand-magic-sparkles mr-1 text-blue-600"></i> Cargar Ejemplo
             </button>
@@ -118,9 +143,55 @@
             <input type="text" id="cotCliente" placeholder="Nombre de empresa cliente" class="input-cell" />
           </div>
         </div>
+
+        <!-- ASISTENTE DE VIÁTICOS POR CIUDAD / UNE -->
+        <div class="mt-4 pt-4 border-t border-slate-100 bg-sky-50/70 p-3.5 rounded-xl border border-sky-200">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+            <span class="text-xs font-bold text-sky-900 uppercase flex items-center gap-1.5">
+              <i class="fa-solid fa-map-location-dot text-sky-600"></i> Cálculo Automático de Viáticos y Traslados por Ciudad (UNE)
+            </span>
+            <span id="ciudadTarifaPreview" class="text-[11px] font-medium text-sky-700 bg-white px-2.5 py-0.5 rounded-full border border-sky-200">
+              Selecciona una ciudad para ver tarifas
+            </span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2.5 items-end">
+            <div class="lg:col-span-2">
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">Ciudad / Zona UNE</label>
+              <select id="calcCiudadSelect" onchange="actualizarPreviewCiudad()" class="input-cell font-semibold text-slate-800"></select>
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">N° Técnicos</label>
+              <input type="number" id="calcCiudadTecnicos" value="2" min="1" step="1" class="input-cell num-right" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">Días Terreno</label>
+              <input type="number" id="calcCiudadDias" value="3" min="1" step="1" class="input-cell num-right" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">Noches Hotel</label>
+              <input type="number" id="calcCiudadNoches" value="2" min="0" step="1" class="input-cell num-right" />
+            </div>
+            <div>
+              <button onclick="aplicarViaticosCiudad()" class="w-full bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold py-2 px-3 rounded-lg transition shadow-xs flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-plus-circle"></i> Agregar Viáticos
+              </button>
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-4 mt-2.5 text-xs text-slate-600">
+            <label class="inline-flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" id="chkIncluirPasaje" checked class="rounded text-sky-600" /> Incluir Pasaje Aéreo + Taxi Aeropuerto (si aplica)
+            </label>
+            <label class="inline-flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" id="chkIncluirVehiculo" checked class="rounded text-sky-600" /> Incluir Arriendo Vehículo + Peajes
+            </label>
+            <label class="inline-flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" id="chkIncluirBonoZona" class="rounded text-sky-600" /> Incluir Bono Cambio de Zona ($50.000/téc)
+            </label>
+          </div>
+        </div>
       </div>
 
-      <!-- Contenedor Dinámico de las 9 Secciones de Costeo -->
+      <!-- Contenedor de las 9 Secciones -->
       <div id="costeoSectionsContainer" class="space-y-5"></div>
 
       <!-- Resumen Comercial Final -->
@@ -135,15 +206,17 @@
               <span class="text-slate-400 text-xs block">COSTO TOTAL SERVICIO PESOS</span>
               <span id="resCostoTotal" class="text-2xl font-extrabold text-white">$0</span>
             </div>
-            <div class="flex gap-2">
+            <div class="flex flex-wrap gap-2">
+              <button onclick="abrirVistaImpresionPDF()" class="bg-slate-700 hover:bg-slate-600 text-white font-semibold px-4 py-2.5 rounded-xl transition flex items-center gap-2 text-sm">
+                <i class="fa-solid fa-file-pdf text-rose-400"></i> PDF / Imprimir
+              </button>
               <button onclick="guardarCosteoCompleto()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold px-5 py-2.5 rounded-xl shadow-lg transition flex items-center gap-2 text-sm">
-                <i class="fa-solid fa-cloud-arrow-up"></i> Guardar Costeo en Google Sheets
+                <i class="fa-solid fa-cloud-arrow-up"></i> Guardar en Google Sheets
               </button>
             </div>
           </div>
         </div>
 
-        <!-- Bloque Comercial (Margen, K de Venta, Utilidad, Venta CLP y UF) -->
         <div class="section-card p-5 border-2 border-blue-200 bg-blue-50/40">
           <h3 class="text-sm font-bold uppercase tracking-wider text-blue-900 mb-4 flex items-center gap-2">
             <i class="fa-solid fa-sack-dollar text-blue-600"></i> Evaluación Comercial
@@ -182,14 +255,14 @@
     </section>
 
     <!-- ===================================================================== -->
-    <!-- PESTAÑA 2: DATOS MAESTROS (CRUD DE TODAS LAS HOJAS DEL EXCEL)         -->
+    <!-- PESTAÑA 2: DATOS MAESTROS                                             -->
     <!-- ===================================================================== -->
     <section id="tab-maestros" class="hidden space-y-5">
       <div class="section-card p-5">
         <div class="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-200">
           <div>
             <h2 class="text-base font-bold text-slate-800">Administración de Datos Maestros (Hojas Auxiliares)</h2>
-            <p class="text-xs text-slate-500">Modifica tarifas HH, bonos, logística, viáticos por zona, vendedores o servicios. Los cambios impactan inmediatamente al cotizador.</p>
+            <p class="text-xs text-slate-500">Modifica tarifas HH, bonos, logística, viáticos por zona, vendedores o servicios.</p>
           </div>
           <div class="flex flex-wrap gap-2">
             <button onclick="recalcularExtrasDesdeBase()" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold px-3 py-2 rounded-lg transition">
@@ -204,7 +277,6 @@
           </div>
         </div>
 
-        <!-- Sub-pestañas de Maestros -->
         <div class="flex flex-wrap gap-1.5 mt-4 border-b border-slate-200 pb-3" id="masterSubTabs">
           <button onclick="selectMasterCategory('hh_servicio')" data-mcat="hh_servicio" class="mcat-btn bg-blue-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">HH Servicio</button>
           <button onclick="selectMasterCategory('hh_extra_servicio')" data-mcat="hh_extra_servicio" class="mcat-btn bg-slate-100 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-lg">HH Extra Servicio</button>
@@ -221,10 +293,7 @@
           <button onclick="selectMasterCategory('catalogo_areas')" data-mcat="catalogo_areas" class="mcat-btn bg-slate-100 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-lg">Catálogo Servicios (Hoja2)</button>
         </div>
 
-        <!-- Formulario Agregar Nuevo Registro Maestro -->
         <div id="masterAddForm" class="mt-4 bg-slate-50 p-3.5 rounded-lg border border-slate-200"></div>
-
-        <!-- Tabla Editable del Maestro Seleccionado -->
         <div class="mt-4 overflow-x-auto">
           <table class="w-full text-left border-collapse text-xs" id="masterTable"></table>
         </div>
@@ -232,7 +301,7 @@
     </section>
 
     <!-- ===================================================================== -->
-    <!-- PESTAÑA 3: HISTORIAL DE COSTEOS                                       -->
+    <!-- PESTAÑA 3: HISTORIAL                                                  -->
     <!-- ===================================================================== -->
     <section id="tab-historial" class="hidden space-y-4">
       <div class="section-card p-5">
@@ -267,31 +336,22 @@
     </section>
 
     <!-- ===================================================================== -->
-    <!-- PESTAÑA 4: CONFIGURACIÓN GOOGLE DRIVE Y APPS SCRIPT                   -->
+    <!-- PESTAÑA 4: GOOGLE DRIVE & SHEETS                                      -->
     <!-- ===================================================================== -->
     <section id="tab-config" class="hidden space-y-6">
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        <!-- Panel de Configuración -->
         <div class="section-card p-6 space-y-4">
           <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
             <i class="fa-brands fa-google-drive text-blue-600 text-lg"></i> Conexión a Carpeta de Google Drive y Sheets
           </h2>
-          <p class="text-xs text-slate-500 leading-relaxed">
-            Configura el directorio de Google Drive donde se creará y actualizará automáticamente la planilla de Google Sheets con todos los costeos y tablas maestras.
-          </p>
-
           <div>
             <label class="block text-xs font-bold text-slate-700 mb-1">1. ID o URL de la Carpeta Destino en Google Drive</label>
-            <input type="text" id="cfgFolderId" placeholder="Ej: 1AbCdEfGhIjKlMnOpQrStUvWxYz123456 o URL completa de la carpeta" class="input-cell" />
-            <span class="text-[11px] text-slate-400">Abre tu carpeta en Google Drive y copia la URL completa o el código final después de /folders/.</span>
+            <input type="text" id="cfgFolderId" placeholder="Ej: 1AbCdEfGhIjKlMnOpQrStUvWxYz123456" class="input-cell" />
           </div>
-
           <div>
             <label class="block text-xs font-bold text-slate-700 mb-1">2. Nombre del Archivo Google Sheets (Base de Datos)</label>
             <input type="text" id="cfgSheetName" value="BD_COSTEO_PILO_CHILE_2026" class="input-cell" />
           </div>
-
           <div>
             <label class="block text-xs font-bold text-slate-700 mb-1">3. URL del Web App (Google Apps Script)</label>
             <input type="text" id="cfgWebAppUrl" placeholder="https://script.google.com/macros/s/AKfycb.../exec" class="input-cell" />
@@ -308,11 +368,9 @@
               <i class="fa-solid fa-cloud-arrow-down mr-1"></i> Importar Maestros desde Sheets
             </button>
           </div>
-
           <div id="driveTestResult" class="hidden p-3 rounded-lg text-xs border"></div>
         </div>
 
-        <!-- Instrucciones y Código Google Apps Script -->
         <div class="section-card p-6 space-y-3 bg-slate-900 text-slate-200">
           <div class="flex items-center justify-between">
             <h3 class="text-sm font-bold text-white flex items-center gap-2">
@@ -322,24 +380,41 @@
               <i class="fa-regular fa-copy mr-1"></i> Copiar Script
             </button>
           </div>
-          <ol class="text-xs text-slate-300 space-y-1 list-decimal list-inside">
-            <li>Ingresa a <a href="https://script.google.com" target="_blank" class="text-blue-400 underline">script.google.com</a> y crea un <strong>Nuevo proyecto</strong>.</li>
-            <li>Pega el siguiente código en <code>Código.gs</code> y guarda el proyecto.</li>
-            <li>Haz clic en <strong>Implementar &gt; Nueva implementación</strong>, selecciona tipo <strong>Aplicación web</strong>.</li>
-            <li>Configura <em>Ejecutar como: Yo</em> y <em>Quién tiene acceso: Cualquier persona</em>, luego copia la URL generada y pégala a la izquierda.</li>
-          </ol>
           <textarea id="appsScriptCodeBox" readonly class="w-full h-72 bg-slate-950 text-emerald-400 font-mono text-[11px] p-3 rounded-lg border border-slate-700 focus:outline-none"></textarea>
         </div>
-
       </div>
     </section>
-
   </main>
 
+  <!-- ===================================================================== -->
+  <!-- MODAL VISTA DE IMPRESIÓN / EXPORTACIÓN PDF                            -->
+  <!-- ===================================================================== -->
+  <div id="printPreviewModal" class="fixed inset-0 z-50 hidden bg-slate-900/80 backdrop-blur-xs overflow-y-auto p-4 sm:p-8">
+    <!-- Barra de acciones del modal (se oculta al imprimir) -->
+    <div id="printModalHeader" class="max-w-4xl mx-auto mb-4 bg-slate-800 text-white px-5 py-3 rounded-xl shadow-lg flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-2 text-sm font-bold">
+        <i class="fa-solid fa-file-pdf text-rose-400 text-lg"></i>
+        <span>Vista Previa de Documento — Listo para Imprimir o Guardar como PDF</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <label class="text-xs flex items-center gap-1.5 mr-3 cursor-pointer">
+          <input type="checkbox" id="chkPdfSoloCliente" onchange="renderDocumentoImpresion()" class="rounded text-blue-500" />
+          Ocultar costos internos (Modo Oferta Cliente)
+        </label>
+        <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-4 py-2 rounded-lg shadow transition flex items-center gap-1.5">
+          <i class="fa-solid fa-print"></i> Imprimir / Guardar PDF
+        </button>
+        <button onclick="cerrarVistaImpresionPDF()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-semibold px-3 py-2 rounded-lg transition">
+          <i class="fa-solid fa-xmark"></i> Cerrar
+        </button>
+      </div>
+    </div>
+
+    <!-- Hoja A4 Imprimible -->
+    <div id="printDocumentArea" class="max-w-4xl mx-auto bg-white p-8 sm:p-10 rounded-xl shadow-2xl border border-slate-200 text-slate-800"></div>
+  </div>
+
   <script>
-    // =========================================================================
-    // 1. DATOS MAESTROS INICIALES EXTRAÍDOS DEL EXCEL PILO CHILE ABRIL 2026
-    // =========================================================================
     const DEFAULT_MASTERS = {
       hh_servicio: [
         { codigo: 'HH ELEC', descripcion: 'HH ELECTRICA', valor: 14400 },
@@ -554,7 +629,6 @@
       ]
     };
 
-    // Definición de las 9 secciones exactas de COSTEO INDUSTRIAL
     const COSTEO_SECTIONS = [
       { id: 'hh_servicio', title: '1. CÓDIGO - HH SERVICIO', masterKey: 'hh_servicio', colCant: 'CANTIDAD HORAS', colPers: 'TÉCNICOS', colVal: 'VALOR HH ($)', icon: 'fa-user-gear', color: 'blue' },
       { id: 'hh_extra_servicio', title: '2. CÓDIGO - HH EXTRA SERVICIO', masterKey: 'hh_extra_servicio', colCant: 'CANTIDAD HORAS', colPers: 'TÉCNICOS', colVal: 'VALOR HH ($)', icon: 'fa-clock', color: 'indigo' },
@@ -567,9 +641,6 @@
       { id: 'examenes_carpetas', title: '9. EXÁMENES / ACREDITACIÓN / OTROS', masterKey: 'examenes_carpetas', colCant: 'CANTIDAD', colPers: 'TÉCNICOS', colVal: 'VALOR UNIT. ($)', icon: 'fa-file-medical', color: 'purple' }
     ];
 
-    // =========================================================================
-    // 2. ESTADO DE LA APLICACIÓN (LOCALSTORAGE)
-    // =========================================================================
     let masters = JSON.parse(localStorage.getItem('pilo_masters_v1')) || JSON.parse(JSON.stringify(DEFAULT_MASTERS));
     let costeoRows = {};
     let historial = JSON.parse(localStorage.getItem('pilo_historial_v1')) || [];
@@ -581,18 +652,12 @@
     };
     let activeMasterCat = 'hh_servicio';
 
-    function saveMastersLocal() {
-      localStorage.setItem('pilo_masters_v1', JSON.stringify(masters));
-    }
-
+    function saveMastersLocal() { localStorage.setItem('pilo_masters_v1', JSON.stringify(masters)); }
     function saveHistorialLocal() {
       localStorage.setItem('pilo_historial_v1', JSON.stringify(historial));
       document.getElementById('histCount').textContent = historial.length;
     }
 
-    // =========================================================================
-    // 3. FORMATEO DE MONEDA CHILENA Y UF
-    // =========================================================================
     const fmtCLP = (n) => '$' + Math.round(n || 0).toLocaleString('es-CL');
     const fmtUF = (n) => (n || 0).toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' UF';
 
@@ -600,21 +665,29 @@
       const toast = document.getElementById('toast');
       const icon = document.getElementById('toastIcon');
       document.getElementById('toastMsg').textContent = msg;
-      icon.className = type === 'error'
-        ? 'fa-solid fa-circle-exclamation text-rose-400 text-lg'
-        : 'fa-solid fa-circle-check text-emerald-400 text-lg';
+      icon.className = type === 'error' ? 'fa-solid fa-circle-exclamation text-rose-400 text-lg' : 'fa-solid fa-circle-check text-emerald-400 text-lg';
       toast.classList.remove('hidden');
-      setTimeout(() => toast.classList.add('hidden'), 3500);
+      setTimeout(() => toast.classList.add('hidden'), 4000);
     }
 
-    // =========================================================================
-    // 4. INICIALIZACIÓN Y RENDERIZADO DEL COTIZADOR
-    // =========================================================================
+    async function callGoogleScriptPost(payloadObj) {
+      const resp = await fetch(driveConfig.webAppUrl.trim(), {
+        method: 'POST',
+        redirect: 'follow',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payloadObj)
+      });
+      const text = await resp.text();
+      try {
+        return JSON.parse(text);
+      } catch (e) {
+        throw new Error('Google devolvió HTML en vez de JSON. Verifica que el Web App esté publicado con acceso "Cualquier persona".');
+      }
+    }
+
     function initCosteoRows() {
       COSTEO_SECTIONS.forEach(sec => {
-        if (!costeoRows[sec.id]) {
-          costeoRows[sec.id] = [createEmptyRow(sec.masterKey)];
-        }
+        if (!costeoRows[sec.id]) costeoRows[sec.id] = [createEmptyRow(sec.masterKey)];
       });
     }
 
@@ -637,15 +710,154 @@
       const selExt = document.getElementById('cotVendedorExterno');
       const prevInt = selInt.value;
       const prevExt = selExt.value;
-
       const internos = masters.vendedores.filter(v => v.tipo === 'INTERNO');
       const externos = masters.vendedores.filter(v => v.tipo === 'EXTERNO');
-
       selInt.innerHTML = internos.map(v => `<option value="${v.nombre}">${v.nombre}</option>`).join('');
       selExt.innerHTML = externos.map(v => `<option value="${v.nombre}">${v.nombre}</option>`).join('');
-
       if (prevInt) selInt.value = prevInt;
       if (prevExt) selExt.value = prevExt;
+    }
+
+    // =========================================================================
+    // SELECTOR DE CIUDADES / VIÁTICOS EN EL COTIZADOR
+    // =========================================================================
+    function populateCiudadesSelector() {
+      const sel = document.getElementById('calcCiudadSelect');
+      if (!sel) return;
+      const prev = sel.value;
+      const grupos = {};
+      (masters.viaticos_zonas || []).forEach((v, idx) => {
+        if (!grupos[v.zona]) grupos[v.zona] = [];
+        grupos[v.zona].push({ ...v, idx });
+      });
+
+      sel.innerHTML = Object.keys(grupos).map(zona => {
+        const opts = grupos[zona].map(c =>
+          `<option value="${c.idx}">${c.ciudad} (${c.zona})</option>`
+        ).join('');
+        return `<optgroup label="${zona}">${opts}</optgroup>`;
+      }).join('');
+
+      if (prev !== '') sel.value = prev;
+      actualizarPreviewCiudad();
+    }
+
+    function actualizarPreviewCiudad() {
+      const sel = document.getElementById('calcCiudadSelect');
+      const preview = document.getElementById('ciudadTarifaPreview');
+      if (!sel || !preview) return;
+      const c = masters.viaticos_zonas[sel.value];
+      if (!c) return;
+      preview.textContent = `Pasaje: ${fmtCLP(c.pasaje)} | Hotel: ${fmtCLP(c.hotel)}/noche | Alim: ${fmtCLP(c.alimentacion)}/día | Vehículo: ${fmtCLP(c.vehiculo)}/día`;
+    }
+
+    function aplicarViaticosCiudad() {
+      const sel = document.getElementById('calcCiudadSelect');
+      const c = masters.viaticos_zonas[sel.value];
+      if (!c) return;
+
+      const tecnicos = Math.max(1, parseInt(document.getElementById('calcCiudadTecnicos').value) || 1);
+      const dias = Math.max(1, parseInt(document.getElementById('calcCiudadDias').value) || 1);
+      const noches = Math.max(0, parseInt(document.getElementById('calcCiudadNoches').value) || 0);
+      const incPasaje = document.getElementById('chkIncluirPasaje').checked;
+      const incVehiculo = document.getElementById('chkIncluirVehiculo').checked;
+      const incBonoZona = document.getElementById('chkIncluirBonoZona').checked;
+
+      // Limpiar fila vacía por defecto si tiene cantidad 0
+      if (costeoRows['gastos_viaje'].length === 1 && costeoRows['gastos_viaje'][0].cantidad === 0) {
+        costeoRows['gastos_viaje'] = [];
+      }
+
+      const ts = Date.now();
+
+      if (incPasaje && c.pasaje > 0) {
+        costeoRows['gastos_viaje'].push({
+          uid: `cv_pas_${ts}`,
+          codigo: `VUELO ${c.ciudad}`,
+          descripcion: `Pasaje Aéreo + Sobreequipaje (${c.ciudad})`,
+          detalle: `Tramo ida/vuelta ${c.ciudad} (${c.zona})`,
+          cantidad: 1,
+          tecnicos: tecnicos,
+          valor: c.pasaje
+        });
+      }
+
+      if (incPasaje && c.taxi > 0) {
+        costeoRows['gastos_viaje'].push({
+          uid: `cv_tax_${ts}`,
+          codigo: 'TAXI CASA - AEROPUERTO-CASA',
+          descripcion: `Taxi Aeropuerto / Hotel (${c.ciudad})`,
+          detalle: `Traslados aeropuerto ${c.ciudad}`,
+          cantidad: 1,
+          tecnicos: tecnicos,
+          valor: c.taxi
+        });
+      }
+
+      if (noches > 0 && c.hotel > 0) {
+        costeoRows['gastos_viaje'].push({
+          uid: `cv_hot_${ts}`,
+          codigo: `HOTEL ${c.ciudad}`,
+          descripcion: `Alojamiento Hotel por Noche (${c.ciudad})`,
+          detalle: `${noches} noche(s) en ${c.ciudad}`,
+          cantidad: noches,
+          tecnicos: tecnicos,
+          valor: c.hotel
+        });
+      }
+
+      if (dias > 0 && c.alimentacion > 0) {
+        costeoRows['gastos_viaje'].push({
+          uid: `cv_ali_${ts}`,
+          codigo: `ALIM ${c.ciudad}`,
+          descripcion: `Asignación Alimentación Diaria (${c.ciudad})`,
+          detalle: `${dias} día(s) en ${c.ciudad}`,
+          cantidad: dias,
+          tecnicos: tecnicos,
+          valor: c.alimentacion
+        });
+      }
+
+      if (incVehiculo && dias > 0) {
+        costeoRows['gastos_viaje'].push({
+          uid: `cv_veh_${ts}`,
+          codigo: 'ARRIENDO DE VEHICULO',
+          descripcion: `Arriendo Vehículo Diario (${c.ciudad})`,
+          detalle: `1 vehículo por ${dias} día(s) en ${c.ciudad}`,
+          cantidad: dias,
+          tecnicos: 1,
+          valor: c.vehiculo
+        });
+        if (c.peaje > 0) {
+          costeoRows['gastos_viaje'].push({
+            uid: `cv_pea_${ts}`,
+            codigo: 'PEAJE Y ESTACIONAMIENTOS',
+            descripcion: `Peajes y Estacionamientos (${c.ciudad})`,
+            detalle: `Estimado ${dias} día(s)`,
+            cantidad: dias,
+            tecnicos: 1,
+            valor: c.peaje
+          });
+        }
+      }
+
+      if (incBonoZona) {
+        if (costeoRows['bonos'].length === 1 && costeoRows['bonos'][0].cantidad === 0) {
+          costeoRows['bonos'] = [];
+        }
+        costeoRows['bonos'].push({
+          uid: `cv_bon_${ts}`,
+          codigo: 'BONO CAMBIO ZONA',
+          descripcion: 'Por fuera de zona una sola vez',
+          detalle: `Comisión desplazamiento a ${c.ciudad}`,
+          cantidad: 1,
+          tecnicos: tecnicos,
+          valor: 50000
+        });
+      }
+
+      renderCosteoSections();
+      showToast(`Viáticos de ${c.ciudad} (${c.zona}) agregados al costeo`);
     }
 
     function renderCosteoSections() {
@@ -653,46 +865,27 @@
       container.innerHTML = COSTEO_SECTIONS.map(sec => {
         const rows = costeoRows[sec.id] || [];
         const optionsList = masters[sec.masterKey] || [];
-
         const rowsHtml = rows.map((row, idx) => {
-          const selectOpts = optionsList.map(opt =>
+          const existsInOpts = optionsList.some(o => o.codigo === row.codigo);
+          const customOpt = !existsInOpts && row.codigo ? `<option value="${row.codigo}" selected>${row.codigo} — ${row.descripcion}</option>` : '';
+          const selectOpts = customOpt + optionsList.map(opt =>
             `<option value="${opt.codigo}" ${opt.codigo === row.codigo ? 'selected' : ''}>${opt.codigo} — ${opt.descripcion}</option>`
           ).join('');
-
           const subtotal = (parseFloat(row.cantidad) || 0) * (parseFloat(row.tecnicos) || 0) * (parseFloat(row.valor) || 0);
-
           return `
             <tr class="hover:bg-slate-50/80 transition">
               <td class="p-2 w-64">
-                <select onchange="onRowCodeChange('${sec.id}', ${idx}, this.value)" class="input-cell font-semibold text-slate-700">
-                  ${selectOpts}
-                </select>
+                <select onchange="onRowCodeChange('${sec.id}', ${idx}, this.value)" class="input-cell font-semibold text-slate-700">${selectOpts}</select>
               </td>
               <td class="p-2 text-xs text-slate-600 font-medium">${row.descripcion}</td>
-              <td class="p-2 w-56">
-                <input type="text" value="${row.detalle}" onchange="onRowFieldChange('${sec.id}', ${idx}, 'detalle', this.value)" placeholder="Detalle del servicio..." class="input-cell" />
-              </td>
-              <td class="p-2 w-28">
-                <input type="number" min="0" step="0.5" value="${row.cantidad}" oninput="onRowFieldChange('${sec.id}', ${idx}, 'cantidad', this.value)" class="input-cell num-right" />
-              </td>
-              <td class="p-2 w-24">
-                <input type="number" min="0" step="1" value="${row.tecnicos}" oninput="onRowFieldChange('${sec.id}', ${idx}, 'tecnicos', this.value)" class="input-cell num-right" />
-              </td>
-              <td class="p-2 w-32">
-                <input type="number" min="0" step="100" value="${row.valor}" oninput="onRowFieldChange('${sec.id}', ${idx}, 'valor', this.value)" class="input-cell num-right bg-slate-50 font-semibold" />
-              </td>
-              <td class="p-2 w-32 num-right font-bold text-slate-800" id="sub_${row.uid}">
-                ${fmtCLP(subtotal)}
-              </td>
-              <td class="p-2 w-10 text-center">
-                <button onclick="removeCosteoRow('${sec.id}', ${idx})" title="Eliminar fila" class="text-slate-400 hover:text-rose-600 transition">
-                  <i class="fa-solid fa-trash-can"></i>
-                </button>
-              </td>
-            </tr>
-          `;
+              <td class="p-2 w-56"><input type="text" value="${row.detalle}" onchange="onRowFieldChange('${sec.id}', ${idx}, 'detalle', this.value)" placeholder="Detalle del servicio..." class="input-cell" /></td>
+              <td class="p-2 w-28"><input type="number" min="0" step="0.5" value="${row.cantidad}" oninput="onRowFieldChange('${sec.id}', ${idx}, 'cantidad', this.value)" class="input-cell num-right" /></td>
+              <td class="p-2 w-24"><input type="number" min="0" step="1" value="${row.tecnicos}" oninput="onRowFieldChange('${sec.id}', ${idx}, 'tecnicos', this.value)" class="input-cell num-right" /></td>
+              <td class="p-2 w-32"><input type="number" min="0" step="100" value="${row.valor}" oninput="onRowFieldChange('${sec.id}', ${idx}, 'valor', this.value)" class="input-cell num-right bg-slate-50 font-semibold" /></td>
+              <td class="p-2 w-32 num-right font-bold text-slate-800" id="sub_${row.uid}">${fmtCLP(subtotal)}</td>
+              <td class="p-2 w-10 text-center"><button onclick="removeCosteoRow('${sec.id}', ${idx})" title="Eliminar fila" class="text-slate-400 hover:text-rose-600 transition"><i class="fa-solid fa-trash-can"></i></button></td>
+            </tr>`;
         }).join('');
-
         return `
           <div class="section-card">
             <div class="bg-slate-50 px-4 py-2.5 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
@@ -720,15 +913,11 @@
                     <th class="p-2"></th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-100">
-                  ${rowsHtml}
-                </tbody>
+                <tbody class="divide-y divide-slate-100">${rowsHtml}</tbody>
               </table>
             </div>
-          </div>
-        `;
+          </div>`;
       }).join('');
-
       recalcularTodo();
     }
 
@@ -775,30 +964,19 @@
     function recalcularTodo() {
       let costoTotalGeneral = 0;
       const resumenHtml = [];
-
       COSTEO_SECTIONS.forEach(sec => {
         const rows = costeoRows[sec.id] || [];
         let secSum = 0;
-        rows.forEach(r => {
-          secSum += (parseFloat(r.cantidad) || 0) * (parseFloat(r.tecnicos) || 0) * (parseFloat(r.valor) || 0);
-        });
+        rows.forEach(r => { secSum += (parseFloat(r.cantidad) || 0) * (parseFloat(r.tecnicos) || 0) * (parseFloat(r.valor) || 0); });
         costoTotalGeneral += secSum;
-
         const secEl = document.getElementById(`secTotal_${sec.id}`);
         if (secEl) secEl.textContent = fmtCLP(secSum);
-
-        resumenHtml.push(`
-          <div class="bg-slate-800/80 border border-slate-700/80 p-2.5 rounded-lg flex justify-between items-center">
-            <span class="text-slate-400 truncate pr-2">${sec.title.replace(/^\d+\.\s*/, '')}</span>
-            <span class="font-bold text-white">${fmtCLP(secSum)}</span>
-          </div>
-        `);
+        resumenHtml.push(`<div class="bg-slate-800/80 border border-slate-700/80 p-2.5 rounded-lg flex justify-between items-center"><span class="text-slate-400 truncate pr-2">${sec.title.replace(/^\d+\.\s*/, '')}</span><span class="font-bold text-white">${fmtCLP(secSum)}</span></div>`);
       });
 
       document.getElementById('resumenSubtotalesGrid').innerHTML = resumenHtml.join('');
       document.getElementById('resCostoTotal').textContent = fmtCLP(costoTotalGeneral);
 
-      // Cálculo Comercial (Fórmulas exactas filas 99-103 del Excel)
       const margenPct = parseFloat(document.getElementById('comMargen').value) || 0;
       const margenDec = Math.min(Math.max(margenPct / 100, 0), 0.99);
       const kVenta = 1 / (1 - margenDec);
@@ -850,16 +1028,157 @@
     }
 
     // =========================================================================
-    // 5. GESTIÓN DE DATOS MAESTROS (CRUD)
+    // VISTA DE IMPRESIÓN / EXPORTACIÓN PDF
+    // =========================================================================
+    function abrirVistaImpresionPDF() {
+      renderDocumentoImpresion();
+      document.getElementById('printPreviewModal').classList.remove('hidden');
+    }
+
+    function cerrarVistaImpresionPDF() {
+      document.getElementById('printPreviewModal').classList.add('hidden');
+    }
+
+    function renderDocumentoImpresion() {
+      const calc = recalcularTodo();
+      const soloCliente = document.getElementById('chkPdfSoloCliente').checked;
+      const fecha = document.getElementById('cotFecha').value || new Date().toISOString().slice(0, 10);
+      const idNegocio = document.getElementById('cotIdNegocio').value.trim() || 'S/N';
+      const cliente = document.getElementById('cotCliente').value.trim() || 'CLIENTE POR DEFINIR';
+      const vendInt = document.getElementById('cotVendedorInterno').value || '-';
+      const vendExt = document.getElementById('cotVendedorExterno').value || '-';
+
+      let seccionesHtml = '';
+      COSTEO_SECTIONS.forEach(sec => {
+        const filasActivas = (costeoRows[sec.id] || []).filter(r => (parseFloat(r.cantidad) || 0) > 0);
+        if (filasActivas.length === 0) return;
+
+        let subSec = 0;
+        const trs = filasActivas.map(r => {
+          const tot = (parseFloat(r.cantidad) || 0) * (parseFloat(r.tecnicos) || 0) * (parseFloat(r.valor) || 0);
+          subSec += tot;
+          return `
+            <tr class="border-b border-slate-200 text-xs">
+              <td class="py-1.5 px-2 font-mono text-[11px] font-semibold text-slate-700">${r.codigo}</td>
+              <td class="py-1.5 px-2">${r.descripcion}${r.detalle ? ` <span class="text-slate-500 italic">(${r.detalle})</span>` : ''}</td>
+              <td class="py-1.5 px-2 text-right">${r.cantidad}</td>
+              <td class="py-1.5 px-2 text-right">${r.tecnicos}</td>
+              ${!soloCliente ? `<td class="py-1.5 px-2 text-right">${fmtCLP(r.valor)}</td><td class="py-1.5 px-2 text-right font-semibold">${fmtCLP(tot)}</td>` : ''}
+            </tr>
+          `;
+        }).join('');
+
+        seccionesHtml += `
+          <div class="mb-4">
+            <div class="bg-slate-100 px-3 py-1.5 font-bold text-xs uppercase text-slate-800 border-y border-slate-300 flex justify-between">
+              <span>${sec.title}</span>
+              ${!soloCliente ? `<span>Subtotal: ${fmtCLP(subSec)}</span>` : ''}
+            </div>
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="text-[10px] uppercase text-slate-500 border-b border-slate-300">
+                  <th class="py-1 px-2 w-36">Código</th>
+                  <th class="py-1 px-2">Descripción / Alcance</th>
+                  <th class="py-1 px-2 text-right w-20">Cant.</th>
+                  <th class="py-1 px-2 text-right w-20">Téc./Un.</th>
+                  ${!soloCliente ? `<th class="py-1 px-2 text-right w-24">Unitario</th><th class="py-1 px-2 text-right w-28">Total ($)</th>` : ''}
+                </tr>
+              </thead>
+              <tbody>${trs}</tbody>
+            </table>
+          </div>
+        `;
+      });
+
+      if (!seccionesHtml) {
+        seccionesHtml = `<p class="text-sm text-slate-400 italic py-6 text-center">No hay partidas con cantidad mayor a 0 en este costeo.</p>`;
+      }
+
+      const resumenFinancieroHtml = soloCliente ? `
+        <div class="mt-6 flex justify-end">
+          <div class="w-80 border border-slate-300 rounded-lg overflow-hidden text-sm">
+            <div class="bg-slate-900 text-white px-4 py-2 font-bold text-xs uppercase">Resumen Valor Oferta Comercial</div>
+            <div class="p-4 space-y-2 bg-slate-50">
+              <div class="flex justify-between"><span>Valor UF Referencia:</span><strong>${fmtCLP(calc.valorUf)}</strong></div>
+              <div class="flex justify-between text-base font-bold text-blue-900 pt-2 border-t border-slate-300">
+                <span>Total Neto (CLP):</span><span>${fmtCLP(calc.ventaClp)}</span>
+              </div>
+              <div class="flex justify-between text-base font-bold text-emerald-700">
+                <span>Total Neto (UF):</span><span>${fmtUF(calc.ventaUf)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      ` : `
+        <div class="mt-6 grid grid-cols-2 gap-6 items-start">
+          <div class="border border-slate-300 rounded-lg p-4 text-xs space-y-1.5 bg-slate-50">
+            <div class="font-bold uppercase text-slate-700 border-b border-slate-200 pb-1 mb-2">Parámetros Internos de Costeo</div>
+            <div class="flex justify-between"><span>Costo Directo Total:</span><strong>${fmtCLP(calc.costoTotalGeneral)}</strong></div>
+            <div class="flex justify-between"><span>Margen Aplicado:</span><strong>${calc.margenPct}%</strong></div>
+            <div class="flex justify-between"><span>Factor K de Venta:</span><strong>${calc.kVenta.toFixed(4).replace('.', ',')}</strong></div>
+            <div class="flex justify-between text-emerald-700"><span>Utilidad Comercial Estimada:</span><strong>${fmtCLP(calc.utilidad)}</strong></div>
+          </div>
+          <div class="border border-slate-300 rounded-lg overflow-hidden text-sm">
+            <div class="bg-slate-900 text-white px-4 py-2 font-bold text-xs uppercase">Totales Comerciales</div>
+            <div class="p-4 space-y-2 bg-blue-50/40">
+              <div class="flex justify-between text-xs"><span>Valor UF Aplicado:</span><strong>${fmtCLP(calc.valorUf)}</strong></div>
+              <div class="flex justify-between text-base font-extrabold text-blue-900 pt-1 border-t border-slate-300">
+                <span>VALOR VENTA ($):</span><span>${fmtCLP(calc.ventaClp)}</span>
+              </div>
+              <div class="flex justify-between text-base font-extrabold text-emerald-700">
+                <span>VALOR VENTA (UF):</span><span>${fmtUF(calc.ventaUf)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('printDocumentArea').innerHTML = `
+        <div class="flex justify-between items-start border-b-2 border-slate-900 pb-4 mb-6">
+          <div>
+            <div class="text-xs font-bold uppercase tracking-widest text-blue-700">PILO CHILE — SERVICIOS INDUSTRIALES</div>
+            <h1 class="text-xl font-extrabold text-slate-900 mt-0.5">${soloCliente ? 'PROPUESTA TÉCNICO-COMERCIAL DE SERVICIOS' : 'HOJA DE COSTEO Y EVALUACIÓN COMERCIAL'}</h1>
+            <p class="text-xs text-slate-500 mt-0.5">PACK-IND-O&G / Soporte e Ingeniería</p>
+          </div>
+          <div class="text-right text-xs space-y-1">
+            <div class="bg-slate-900 text-white px-3 py-1 rounded font-bold">ID NEGOCIO: ${idNegocio}</div>
+            <div class="text-slate-600">Fecha: <strong>${fecha}</strong></div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 bg-slate-50 p-3.5 rounded-lg border border-slate-200 text-xs mb-6">
+          <div><span class="text-slate-500 block">CLIENTE:</span><strong class="text-sm text-slate-900">${cliente}</strong></div>
+          <div class="space-y-1">
+            <div><span class="text-slate-500">Vendedor Interno:</span> <strong>${vendInt}</strong></div>
+            <div><span class="text-slate-500">Vendedor Externo:</span> <strong>${vendExt}</strong></div>
+          </div>
+        </div>
+
+        ${seccionesHtml}
+        ${resumenFinancieroHtml}
+
+        <div class="mt-12 pt-6 border-t border-slate-300 grid grid-cols-2 gap-8 text-center text-xs text-slate-500">
+          <div>
+            <div class="border-b border-slate-400 w-56 mx-auto mb-1.5 h-8"></div>
+            <div>Elaborado por: ${vendInt}</div>
+          </div>
+          <div>
+            <div class="border-b border-slate-400 w-56 mx-auto mb-1.5 h-8"></div>
+            <div>Nombre y Firma de quien valida</div>
+          </div>
+        </div>
+      `;
+    }
+
+    // =========================================================================
+    // CRUD DATOS MAESTROS
     // =========================================================================
     function selectMasterCategory(cat) {
       activeMasterCat = cat;
       document.querySelectorAll('.mcat-btn').forEach(btn => {
-        if (btn.dataset.mcat === cat) {
-          btn.className = 'mcat-btn bg-blue-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-xs';
-        } else {
-          btn.className = 'mcat-btn bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-lg';
-        }
+        btn.className = btn.dataset.mcat === cat
+          ? 'mcat-btn bg-blue-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-xs'
+          : 'mcat-btn bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-lg';
       });
       renderMasterEditor();
     }
@@ -870,272 +1189,31 @@
       const data = masters[activeMasterCat] || [];
 
       if (activeMasterCat === 'vendedores') {
-        formDiv.innerHTML = `
-          <div class="flex flex-wrap items-end gap-3">
-            <div>
-              <label class="block text-[11px] font-bold text-slate-600 mb-1">Tipo Vendedor</label>
-              <select id="newVendTipo" class="input-cell w-36">
-                <option value="INTERNO">INTERNO</option>
-                <option value="EXTERNO">EXTERNO</option>
-              </select>
-            </div>
-            <div class="flex-1 min-w-[220px]">
-              <label class="block text-[11px] font-bold text-slate-600 mb-1">Nombre Completo</label>
-              <input type="text" id="newVendNombre" placeholder="Apellidos y Nombres" class="input-cell" />
-            </div>
-            <button onclick="addMasterItem()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-4 py-2 rounded-lg">
-              <i class="fa-solid fa-plus mr-1"></i> Agregar Vendedor
-            </button>
-          </div>
-        `;
-        table.innerHTML = `
-          <thead>
-            <tr class="bg-slate-100 text-slate-600 uppercase border-b border-slate-200">
-              <th class="p-2">Tipo</th>
-              <th class="p-2">Nombre del Vendedor</th>
-              <th class="p-2 text-center w-20">Eliminar</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-100">
-            ${data.map((item, i) => `
-              <tr>
-                <td class="p-2 w-36">
-                  <select onchange="updateMasterField(${i}, 'tipo', this.value)" class="input-cell">
-                    <option value="INTERNO" ${item.tipo === 'INTERNO' ? 'selected' : ''}>INTERNO</option>
-                    <option value="EXTERNO" ${item.tipo === 'EXTERNO' ? 'selected' : ''}>EXTERNO</option>
-                  </select>
-                </td>
-                <td class="p-2"><input type="text" value="${item.nombre}" onchange="updateMasterField(${i}, 'nombre', this.value)" class="input-cell" /></td>
-                <td class="p-2 text-center"><button onclick="deleteMasterItem(${i})" class="text-rose-500 hover:text-rose-700"><i class="fa-solid fa-trash"></i></button></td>
-              </tr>
-            `).join('')}
-          </tbody>
-        `;
+        formDiv.innerHTML = `<div class="flex flex-wrap items-end gap-3"><div><label class="block text-[11px] font-bold text-slate-600 mb-1">Tipo Vendedor</label><select id="newVendTipo" class="input-cell w-36"><option value="INTERNO">INTERNO</option><option value="EXTERNO">EXTERNO</option></select></div><div class="flex-1 min-w-[220px]"><label class="block text-[11px] font-bold text-slate-600 mb-1">Nombre Completo</label><input type="text" id="newVendNombre" placeholder="Apellidos y Nombres" class="input-cell" /></div><button onclick="addMasterItem()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-4 py-2 rounded-lg"><i class="fa-solid fa-plus mr-1"></i> Agregar Vendedor</button></div>`;
+        table.innerHTML = `<thead><tr class="bg-slate-100 text-slate-600 uppercase border-b border-slate-200"><th class="p-2">Tipo</th><th class="p-2">Nombre del Vendedor</th><th class="p-2 text-center w-20">Eliminar</th></tr></thead><tbody class="divide-y divide-slate-100">${data.map((item, i) => `<tr><td class="p-2 w-36"><select onchange="updateMasterField(${i}, 'tipo', this.value)" class="input-cell"><option value="INTERNO" ${item.tipo === 'INTERNO' ? 'selected' : ''}>INTERNO</option><option value="EXTERNO" ${item.tipo === 'EXTERNO' ? 'selected' : ''}>EXTERNO</option></select></td><td class="p-2"><input type="text" value="${item.nombre}" onchange="updateMasterField(${i}, 'nombre', this.value)" class="input-cell" /></td><td class="p-2 text-center"><button onclick="deleteMasterItem(${i})" class="text-rose-500 hover:text-rose-700"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('')}</tbody>`;
         return;
       }
 
       if (activeMasterCat === 'viaticos_zonas') {
-        formDiv.innerHTML = `
-          <div class="grid grid-cols-2 sm:grid-cols-6 gap-2 items-end">
-            <div>
-              <label class="block text-[11px] font-bold text-slate-600 mb-1">UNE / Zona</label>
-              <select id="newViatZona" class="input-cell">
-                <option value="UNE CENTRO">UNE CENTRO</option>
-                <option value="UNE NORTE">UNE NORTE</option>
-                <option value="UNE SUR">UNE SUR</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-[11px] font-bold text-slate-600 mb-1">Ciudad</label>
-              <input type="text" id="newViatCiudad" placeholder="Ej: OSORNO" class="input-cell" />
-            </div>
-            <div>
-              <label class="block text-[11px] font-bold text-slate-600 mb-1">Pasaje Aéreo ($)</label>
-              <input type="number" id="newViatPasaje" value="0" class="input-cell num-right" />
-            </div>
-            <div>
-              <label class="block text-[11px] font-bold text-slate-600 mb-1">Hotel/Noche ($)</label>
-              <input type="number" id="newViatHotel" value="80000" class="input-cell num-right" />
-            </div>
-            <div>
-              <label class="block text-[11px] font-bold text-slate-600 mb-1">Alimentación ($)</label>
-              <input type="number" id="newViatAlim" value="20000" class="input-cell num-right" />
-            </div>
-            <button onclick="addMasterItem()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-2 rounded-lg">
-              <i class="fa-solid fa-plus mr-1"></i> Agregar Ciudad
-            </button>
-          </div>
-        `;
-        table.innerHTML = `
-          <thead>
-            <tr class="bg-slate-100 text-slate-600 uppercase border-b border-slate-200 text-[11px]">
-              <th class="p-2">Zona</th>
-              <th class="p-2">Ciudad</th>
-              <th class="p-2 text-right">Pasaje Aéreo</th>
-              <th class="p-2 text-right">Vehículo/Día</th>
-              <th class="p-2 text-right">Camioneta Min.</th>
-              <th class="p-2 text-right">Hotel/Noche</th>
-              <th class="p-2 text-right">Alimentación</th>
-              <th class="p-2 text-right">Bono Festivo</th>
-              <th class="p-2 text-center">Acción</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-100">
-            ${data.map((item, i) => `
-              <tr>
-                <td class="p-1.5 font-semibold">${item.zona}</td>
-                <td class="p-1.5"><input type="text" value="${item.ciudad}" onchange="updateMasterField(${i}, 'ciudad', this.value)" class="input-cell font-semibold" /></td>
-                <td class="p-1.5"><input type="number" value="${item.pasaje}" onchange="updateMasterField(${i}, 'pasaje', +this.value)" class="input-cell num-right" /></td>
-                <td class="p-1.5"><input type="number" value="${item.vehiculo}" onchange="updateMasterField(${i}, 'vehiculo', +this.value)" class="input-cell num-right" /></td>
-                <td class="p-1.5"><input type="number" value="${item.camioneta}" onchange="updateMasterField(${i}, 'camioneta', +this.value)" class="input-cell num-right" /></td>
-                <td class="p-1.5"><input type="number" value="${item.hotel}" onchange="updateMasterField(${i}, 'hotel', +this.value)" class="input-cell num-right" /></td>
-                <td class="p-1.5"><input type="number" value="${item.alimentacion}" onchange="updateMasterField(${i}, 'alimentacion', +this.value)" class="input-cell num-right" /></td>
-                <td class="p-1.5"><input type="number" value="${item.bonoFestivo}" onchange="updateMasterField(${i}, 'bonoFestivo', +this.value)" class="input-cell num-right" /></td>
-                <td class="p-1.5 text-center">
-                  <button onclick="enviarViaticoACotizador(${i})" title="Enviar viáticos de esta ciudad al cotizador" class="text-blue-600 hover:text-blue-800 mr-2"><i class="fa-solid fa-paper-plane"></i></button>
-                  <button onclick="deleteMasterItem(${i})" class="text-rose-500 hover:text-rose-700"><i class="fa-solid fa-trash"></i></button>
-                </td>
-              </tr>
-            `).join('')}
-          </tbody>
-        `;
+        formDiv.innerHTML = `<div class="grid grid-cols-2 sm:grid-cols-6 gap-2 items-end"><div><label class="block text-[11px] font-bold text-slate-600 mb-1">UNE / Zona</label><select id="newViatZona" class="input-cell"><option value="UNE CENTRO">UNE CENTRO</option><option value="UNE NORTE">UNE NORTE</option><option value="UNE SUR">UNE SUR</option></select></div><div><label class="block text-[11px] font-bold text-slate-600 mb-1">Ciudad</label><input type="text" id="newViatCiudad" placeholder="Ej: OSORNO" class="input-cell" /></div><div><label class="block text-[11px] font-bold text-slate-600 mb-1">Pasaje Aéreo ($)</label><input type="number" id="newViatPasaje" value="0" class="input-cell num-right" /></div><div><label class="block text-[11px] font-bold text-slate-600 mb-1">Hotel/Noche ($)</label><input type="number" id="newViatHotel" value="80000" class="input-cell num-right" /></div><div><label class="block text-[11px] font-bold text-slate-600 mb-1">Alimentación ($)</label><input type="number" id="newViatAlim" value="20000" class="input-cell num-right" /></div><button onclick="addMasterItem()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-2 rounded-lg"><i class="fa-solid fa-plus mr-1"></i> Agregar Ciudad</button></div>`;
+        table.innerHTML = `<thead><tr class="bg-slate-100 text-slate-600 uppercase border-b border-slate-200 text-[11px]"><th class="p-2">Zona</th><th class="p-2">Ciudad</th><th class="p-2 text-right">Pasaje Aéreo</th><th class="p-2 text-right">Vehículo/Día</th><th class="p-2 text-right">Camioneta Min.</th><th class="p-2 text-right">Hotel/Noche</th><th class="p-2 text-right">Alimentación</th><th class="p-2 text-right">Bono Festivo</th><th class="p-2 text-center">Acción</th></tr></thead><tbody class="divide-y divide-slate-100">${data.map((item, i) => `<tr><td class="p-1.5 font-semibold">${item.zona}</td><td class="p-1.5"><input type="text" value="${item.ciudad}" onchange="updateMasterField(${i}, 'ciudad', this.value)" class="input-cell font-semibold" /></td><td class="p-1.5"><input type="number" value="${item.pasaje}" onchange="updateMasterField(${i}, 'pasaje', +this.value)" class="input-cell num-right" /></td><td class="p-1.5"><input type="number" value="${item.vehiculo}" onchange="updateMasterField(${i}, 'vehiculo', +this.value)" class="input-cell num-right" /></td><td class="p-1.5"><input type="number" value="${item.camioneta}" onchange="updateMasterField(${i}, 'camioneta', +this.value)" class="input-cell num-right" /></td><td class="p-1.5"><input type="number" value="${item.hotel}" onchange="updateMasterField(${i}, 'hotel', +this.value)" class="input-cell num-right" /></td><td class="p-1.5"><input type="number" value="${item.alimentacion}" onchange="updateMasterField(${i}, 'alimentacion', +this.value)" class="input-cell num-right" /></td><td class="p-1.5"><input type="number" value="${item.bonoFestivo}" onchange="updateMasterField(${i}, 'bonoFestivo', +this.value)" class="input-cell num-right" /></td><td class="p-1.5 text-center"><button onclick="enviarViaticoACotizador(${i})" title="Enviar viáticos de esta ciudad al cotizador" class="text-blue-600 hover:text-blue-800 mr-2"><i class="fa-solid fa-paper-plane"></i></button><button onclick="deleteMasterItem(${i})" class="text-rose-500 hover:text-rose-700"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('')}</tbody>`;
         return;
       }
 
       if (activeMasterCat === 'servicios_remotos') {
-        formDiv.innerHTML = `
-          <div class="grid grid-cols-1 sm:grid-cols-6 gap-2 items-end">
-            <div>
-              <label class="block text-[11px] font-bold text-slate-600 mb-1">Hoja / Categoría</label>
-              <select id="newRemCat" class="input-cell">
-                <option value="INSTALACIONES NUEVAS">INSTALACIONES NUEVAS</option>
-                <option value="OTROS SERVICIOS REMOTOS">OTROS SERVICIOS REMOTOS</option>
-                <option value="PREENTREGA INTEGRAL">PREENTREGA INTEGRAL</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-[11px] font-bold text-slate-600 mb-1">Código</label>
-              <input type="text" id="newRemCod" placeholder="SERVIO-INST-..." class="input-cell" />
-            </div>
-            <div class="sm:col-span-2">
-              <label class="block text-[11px] font-bold text-slate-600 mb-1">Descripción de Actividad</label>
-              <input type="text" id="newRemDesc" placeholder="Descripción..." class="input-cell" />
-            </div>
-            <div>
-              <label class="block text-[11px] font-bold text-slate-600 mb-1">Cant. HH</label>
-              <input type="number" id="newRemHh" value="4" class="input-cell num-right" />
-            </div>
-            <button onclick="addMasterItem()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-2 rounded-lg">
-              <i class="fa-solid fa-plus mr-1"></i> Agregar
-            </button>
-          </div>
-        `;
-        table.innerHTML = `
-          <thead>
-            <tr class="bg-slate-100 text-slate-600 uppercase border-b border-slate-200">
-              <th class="p-2">Categoría</th>
-              <th class="p-2">Código</th>
-              <th class="p-2">Descripción Actividad</th>
-              <th class="p-2 text-right">Cant. HH</th>
-              <th class="p-2 text-right">Valor HH (UF)</th>
-              <th class="p-2 text-right">Costo (UF)</th>
-              <th class="p-2 text-right">Venta Sug. (UF)</th>
-              <th class="p-2 text-center">Acción</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-100">
-            ${data.map((item, i) => `
-              <tr>
-                <td class="p-2 font-semibold text-slate-600">${item.categoria}</td>
-                <td class="p-2 font-mono text-[11px]">${item.codigo}</td>
-                <td class="p-2"><input type="text" value="${item.descripcion}" onchange="updateMasterField(${i}, 'descripcion', this.value)" class="input-cell" /></td>
-                <td class="p-2 w-20"><input type="number" value="${item.hh}" onchange="updateRemoteService(${i}, 'hh', +this.value)" class="input-cell num-right" /></td>
-                <td class="p-2 w-24"><input type="number" step="0.01" value="${item.valorHhUf}" onchange="updateRemoteService(${i}, 'valorHhUf', +this.value)" class="input-cell num-right" /></td>
-                <td class="p-2 text-right font-semibold">${item.costoUf.toFixed(2)} UF</td>
-                <td class="p-2 text-right font-bold text-emerald-700">${item.ventaUf.toFixed(2)} UF</td>
-                <td class="p-2 text-center">
-                  <button onclick="enviarRemotoACotizador(${i})" title="Agregar HH al cotizador" class="text-blue-600 hover:text-blue-800 mr-2"><i class="fa-solid fa-paper-plane"></i></button>
-                  <button onclick="deleteMasterItem(${i})" class="text-rose-500 hover:text-rose-700"><i class="fa-solid fa-trash"></i></button>
-                </td>
-              </tr>
-            `).join('')}
-          </tbody>
-        `;
+        formDiv.innerHTML = `<div class="grid grid-cols-1 sm:grid-cols-6 gap-2 items-end"><div><label class="block text-[11px] font-bold text-slate-600 mb-1">Hoja / Categoría</label><select id="newRemCat" class="input-cell"><option value="INSTALACIONES NUEVAS">INSTALACIONES NUEVAS</option><option value="OTROS SERVICIOS REMOTOS">OTROS SERVICIOS REMOTOS</option><option value="PREENTREGA INTEGRAL">PREENTREGA INTEGRAL</option></select></div><div><label class="block text-[11px] font-bold text-slate-600 mb-1">Código</label><input type="text" id="newRemCod" placeholder="SERVIO-INST-..." class="input-cell" /></div><div class="sm:col-span-2"><label class="block text-[11px] font-bold text-slate-600 mb-1">Descripción de Actividad</label><input type="text" id="newRemDesc" placeholder="Descripción..." class="input-cell" /></div><div><label class="block text-[11px] font-bold text-slate-600 mb-1">Cant. HH</label><input type="number" id="newRemHh" value="4" class="input-cell num-right" /></div><button onclick="addMasterItem()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-2 rounded-lg"><i class="fa-solid fa-plus mr-1"></i> Agregar</button></div>`;
+        table.innerHTML = `<thead><tr class="bg-slate-100 text-slate-600 uppercase border-b border-slate-200"><th class="p-2">Categoría</th><th class="p-2">Código</th><th class="p-2">Descripción Actividad</th><th class="p-2 text-right">Cant. HH</th><th class="p-2 text-right">Valor HH (UF)</th><th class="p-2 text-right">Costo (UF)</th><th class="p-2 text-right">Venta Sug. (UF)</th><th class="p-2 text-center">Acción</th></tr></thead><tbody class="divide-y divide-slate-100">${data.map((item, i) => `<tr><td class="p-2 font-semibold text-slate-600">${item.categoria}</td><td class="p-2 font-mono text-[11px]">${item.codigo}</td><td class="p-2"><input type="text" value="${item.descripcion}" onchange="updateMasterField(${i}, 'descripcion', this.value)" class="input-cell" /></td><td class="p-2 w-20"><input type="number" value="${item.hh}" onchange="updateRemoteService(${i}, 'hh', +this.value)" class="input-cell num-right" /></td><td class="p-2 w-24"><input type="number" step="0.01" value="${item.valorHhUf}" onchange="updateRemoteService(${i}, 'valorHhUf', +this.value)" class="input-cell num-right" /></td><td class="p-2 text-right font-semibold">${item.costoUf.toFixed(2)} UF</td><td class="p-2 text-right font-bold text-emerald-700">${item.ventaUf.toFixed(2)} UF</td><td class="p-2 text-center"><button onclick="enviarRemotoACotizador(${i})" title="Agregar HH al cotizador" class="text-blue-600 hover:text-blue-800 mr-2"><i class="fa-solid fa-paper-plane"></i></button><button onclick="deleteMasterItem(${i})" class="text-rose-500 hover:text-rose-700"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('')}</tbody>`;
         return;
       }
 
       if (activeMasterCat === 'catalogo_areas') {
-        formDiv.innerHTML = `
-          <div class="grid grid-cols-1 sm:grid-cols-5 gap-2 items-end">
-            <div class="sm:col-span-2">
-              <label class="block text-[11px] font-bold text-slate-600 mb-1">Nombre del Servicio</label>
-              <input type="text" id="newCatNombre" placeholder="Ej: CALIBRACIÓN DE BASCULA..." class="input-cell" />
-            </div>
-            <div>
-              <label class="block text-[11px] font-bold text-slate-600 mb-1">Código</label>
-              <input type="text" id="newCatCodigo" placeholder="SERVICIO-..." class="input-cell" />
-            </div>
-            <div>
-              <label class="block text-[11px] font-bold text-slate-600 mb-1">Área</label>
-              <select id="newCatArea" class="input-cell">
-                <option value="INDUSTRIAL">INDUSTRIAL</option>
-                <option value="PACKAGING">PACKAGING</option>
-                <option value="O&G">O&G</option>
-                <option value="ELECTRICA">ELECTRICA</option>
-                <option value="LABORATORIO">LABORATORIO</option>
-              </select>
-            </div>
-            <button onclick="addMasterItem()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-2 rounded-lg">
-              <i class="fa-solid fa-plus mr-1"></i> Agregar
-            </button>
-          </div>
-        `;
-        table.innerHTML = `
-          <thead>
-            <tr class="bg-slate-100 text-slate-600 uppercase border-b border-slate-200">
-              <th class="p-2">País</th>
-              <th class="p-2">Nombre Ítem</th>
-              <th class="p-2">Código</th>
-              <th class="p-2">Área</th>
-              <th class="p-2 text-center">Eliminar</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-100">
-            ${data.map((item, i) => `
-              <tr>
-                <td class="p-2 w-24">${item.pais}</td>
-                <td class="p-2"><input type="text" value="${item.nombre}" onchange="updateMasterField(${i}, 'nombre', this.value)" class="input-cell" /></td>
-                <td class="p-2 font-mono"><input type="text" value="${item.codigo}" onchange="updateMasterField(${i}, 'codigo', this.value)" class="input-cell" /></td>
-                <td class="p-2 w-36"><input type="text" value="${item.area}" onchange="updateMasterField(${i}, 'area', this.value)" class="input-cell" /></td>
-                <td class="p-2 text-center"><button onclick="deleteMasterItem(${i})" class="text-rose-500 hover:text-rose-700"><i class="fa-solid fa-trash"></i></button></td>
-              </tr>
-            `).join('')}
-          </tbody>
-        `;
+        formDiv.innerHTML = `<div class="grid grid-cols-1 sm:grid-cols-5 gap-2 items-end"><div class="sm:col-span-2"><label class="block text-[11px] font-bold text-slate-600 mb-1">Nombre del Servicio</label><input type="text" id="newCatNombre" placeholder="Ej: CALIBRACIÓN DE BASCULA..." class="input-cell" /></div><div><label class="block text-[11px] font-bold text-slate-600 mb-1">Código</label><input type="text" id="newCatCodigo" placeholder="SERVICIO-..." class="input-cell" /></div><div><label class="block text-[11px] font-bold text-slate-600 mb-1">Área</label><select id="newCatArea" class="input-cell"><option value="INDUSTRIAL">INDUSTRIAL</option><option value="PACKAGING">PACKAGING</option><option value="O&G">O&G</option><option value="ELECTRICA">ELECTRICA</option><option value="LABORATORIO">LABORATORIO</option></select></div><button onclick="addMasterItem()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-2 rounded-lg"><i class="fa-solid fa-plus mr-1"></i> Agregar</button></div>`;
+        table.innerHTML = `<thead><tr class="bg-slate-100 text-slate-600 uppercase border-b border-slate-200"><th class="p-2">País</th><th class="p-2">Nombre Ítem</th><th class="p-2">Código</th><th class="p-2">Área</th><th class="p-2 text-center">Eliminar</th></tr></thead><tbody class="divide-y divide-slate-100">${data.map((item, i) => `<tr><td class="p-2 w-24">${item.pais}</td><td class="p-2"><input type="text" value="${item.nombre}" onchange="updateMasterField(${i}, 'nombre', this.value)" class="input-cell" /></td><td class="p-2 font-mono"><input type="text" value="${item.codigo}" onchange="updateMasterField(${i}, 'codigo', this.value)" class="input-cell" /></td><td class="p-2 w-36"><input type="text" value="${item.area}" onchange="updateMasterField(${i}, 'area', this.value)" class="input-cell" /></td><td class="p-2 text-center"><button onclick="deleteMasterItem(${i})" class="text-rose-500 hover:text-rose-700"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('')}</tbody>`;
         return;
       }
 
-      // Tablas estándar (Código, Descripción, Valor $)
-      formDiv.innerHTML = `
-        <div class="flex flex-wrap items-end gap-3">
-          <div class="w-48">
-            <label class="block text-[11px] font-bold text-slate-600 mb-1">Código</label>
-            <input type="text" id="newStdCod" placeholder="Ej: HH NUEVO" class="input-cell" />
-          </div>
-          <div class="flex-1 min-w-[220px]">
-            <label class="block text-[11px] font-bold text-slate-600 mb-1">Descripción</label>
-            <input type="text" id="newStdDesc" placeholder="Descripción del tarifario" class="input-cell" />
-          </div>
-          <div class="w-36">
-            <label class="block text-[11px] font-bold text-slate-600 mb-1">Monto / Tarifa ($)</label>
-            <input type="number" id="newStdVal" placeholder="15000" class="input-cell num-right" />
-          </div>
-          <button onclick="addMasterItem()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-4 py-2 rounded-lg">
-            <i class="fa-solid fa-plus mr-1"></i> Agregar Tarifa
-          </button>
-        </div>
-      `;
-
-      table.innerHTML = `
-        <thead>
-          <tr class="bg-slate-100 text-slate-600 uppercase border-b border-slate-200">
-            <th class="p-2 w-56">Código</th>
-            <th class="p-2">Descripción</th>
-            <th class="p-2 text-right w-40">Monto / Tarifa ($)</th>
-            <th class="p-2 text-center w-20">Eliminar</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-          ${data.map((item, i) => `
-            <tr>
-              <td class="p-2"><input type="text" value="${item.codigo}" onchange="updateMasterField(${i}, 'codigo', this.value)" class="input-cell font-semibold" /></td>
-              <td class="p-2"><input type="text" value="${item.descripcion}" onchange="updateMasterField(${i}, 'descripcion', this.value)" class="input-cell" /></td>
-              <td class="p-2"><input type="number" value="${item.valor}" onchange="updateMasterField(${i}, 'valor', +this.value)" class="input-cell num-right font-bold" /></td>
-              <td class="p-2 text-center"><button onclick="deleteMasterItem(${i})" class="text-rose-500 hover:text-rose-700"><i class="fa-solid fa-trash"></i></button></td>
-            </tr>
-          `).join('')}
-        </tbody>
-      `;
+      formDiv.innerHTML = `<div class="flex flex-wrap items-end gap-3"><div class="w-48"><label class="block text-[11px] font-bold text-slate-600 mb-1">Código</label><input type="text" id="newStdCod" placeholder="Ej: HH NUEVO" class="input-cell" /></div><div class="flex-1 min-w-[220px]"><label class="block text-[11px] font-bold text-slate-600 mb-1">Descripción</label><input type="text" id="newStdDesc" placeholder="Descripción del tarifario" class="input-cell" /></div><div class="w-36"><label class="block text-[11px] font-bold text-slate-600 mb-1">Monto / Tarifa ($)</label><input type="number" id="newStdVal" placeholder="15000" class="input-cell num-right" /></div><button onclick="addMasterItem()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-4 py-2 rounded-lg"><i class="fa-solid fa-plus mr-1"></i> Agregar Tarifa</button></div>`;
+      table.innerHTML = `<thead><tr class="bg-slate-100 text-slate-600 uppercase border-b border-slate-200"><th class="p-2 w-56">Código</th><th class="p-2">Descripción</th><th class="p-2 text-right w-40">Monto / Tarifa ($)</th><th class="p-2 text-center w-20">Eliminar</th></tr></thead><tbody class="divide-y divide-slate-100">${data.map((item, i) => `<tr><td class="p-2"><input type="text" value="${item.codigo}" onchange="updateMasterField(${i}, 'codigo', this.value)" class="input-cell font-semibold" /></td><td class="p-2"><input type="text" value="${item.descripcion}" onchange="updateMasterField(${i}, 'descripcion', this.value)" class="input-cell" /></td><td class="p-2"><input type="number" value="${item.valor}" onchange="updateMasterField(${i}, 'valor', +this.value)" class="input-cell num-right font-bold" /></td><td class="p-2 text-center"><button onclick="deleteMasterItem(${i})" class="text-rose-500 hover:text-rose-700"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('')}</tbody>`;
     }
 
     function addMasterItem() {
@@ -1148,15 +1226,7 @@
         const zona = document.getElementById('newViatZona').value;
         const ciudad = document.getElementById('newViatCiudad').value.trim().toUpperCase();
         if (!ciudad) return showToast('Ingresa la ciudad', 'error');
-        masters.viaticos_zonas.push({
-          zona, ciudad,
-          pasaje: +document.getElementById('newViatPasaje').value || 0,
-          vehiculo: 80000, camioneta: 180000, gasolina100km: 25000,
-          hotel: +document.getElementById('newViatHotel').value || 80000,
-          taxi: 43000, peaje: 15000,
-          alimentacion: +document.getElementById('newViatAlim').value || 20000,
-          bonoFestivo: 95000
-        });
+        masters.viaticos_zonas.push({ zona, ciudad, pasaje: +document.getElementById('newViatPasaje').value || 0, vehiculo: 80000, camioneta: 180000, gasolina100km: 25000, hotel: +document.getElementById('newViatHotel').value || 80000, taxi: 43000, peaje: 15000, alimentacion: +document.getElementById('newViatAlim').value || 20000, bonoFestivo: 95000 });
       } else if (activeMasterCat === 'servicios_remotos') {
         const categoria = document.getElementById('newRemCat').value;
         const codigo = document.getElementById('newRemCod').value.trim();
@@ -1178,19 +1248,13 @@
         if (!codigo || !descripcion) return showToast('Completa código y descripción', 'error');
         masters[activeMasterCat].push({ codigo, descripcion, valor });
       }
-
-      saveMastersLocal();
-      populateVendedoresSelects();
-      renderMasterEditor();
-      renderCosteoSections();
+      saveMastersLocal(); populateVendedoresSelects(); populateCiudadesSelector(); renderMasterEditor(); renderCosteoSections();
       showToast('Registro maestro agregado correctamente');
     }
 
     function updateMasterField(index, field, val) {
       masters[activeMasterCat][index][field] = val;
-      saveMastersLocal();
-      populateVendedoresSelects();
-      renderCosteoSections();
+      saveMastersLocal(); populateVendedoresSelects(); populateCiudadesSelector(); renderCosteoSections();
       showToast('Dato maestro actualizado');
     }
 
@@ -1199,173 +1263,79 @@
       item[field] = val;
       item.costoUf = item.hh * item.valorHhUf;
       item.ventaUf = item.costoUf * 1.43;
-      saveMastersLocal();
-      renderMasterEditor();
+      saveMastersLocal(); renderMasterEditor();
       showToast('Tarifa remota recalculada');
     }
 
     function deleteMasterItem(index) {
       masters[activeMasterCat].splice(index, 1);
-      saveMastersLocal();
-      populateVendedoresSelects();
-      renderMasterEditor();
-      renderCosteoSections();
+      saveMastersLocal(); populateVendedoresSelects(); populateCiudadesSelector(); renderMasterEditor(); renderCosteoSections();
       showToast('Registro eliminado');
     }
 
     function recalcularExtrasDesdeBase() {
-      // Aplica factor 1.5x sobre HH Servicio -> HH Extra Servicio y HH Traslado -> HH Extra Traslado
-      masters.hh_extra_servicio.forEach((ext, i) => {
-        if (masters.hh_servicio[i]) {
-          ext.valor = Math.round(masters.hh_servicio[i].valor * 1.5);
-        }
-      });
-      masters.hh_extra_traslado.forEach((ext, i) => {
-        if (masters.hh_traslado[i]) {
-          ext.valor = Math.round(masters.hh_traslado[i].valor * 1.5);
-        }
-      });
-      saveMastersLocal();
-      renderMasterEditor();
-      renderCosteoSections();
+      masters.hh_extra_servicio.forEach((ext, i) => { if (masters.hh_servicio[i]) ext.valor = Math.round(masters.hh_servicio[i].valor * 1.5); });
+      masters.hh_extra_traslado.forEach((ext, i) => { if (masters.hh_traslado[i]) ext.valor = Math.round(masters.hh_traslado[i].valor * 1.5); });
+      saveMastersLocal(); renderMasterEditor(); renderCosteoSections();
       showToast('Horas Extra recalculadas al 1.5x según tarifa base');
     }
 
     function restaurarMaestrosFabrica() {
       if (!confirm('¿Deseas restaurar todas las tablas maestras a los valores originales del Excel Abril 2026?')) return;
       masters = JSON.parse(JSON.stringify(DEFAULT_MASTERS));
-      saveMastersLocal();
-      populateVendedoresSelects();
-      renderMasterEditor();
-      renderCosteoSections();
+      saveMastersLocal(); populateVendedoresSelects(); populateCiudadesSelector(); renderMasterEditor(); renderCosteoSections();
       showToast('Valores maestros restaurados');
     }
 
     function enviarViaticoACotizador(idx) {
-      const v = masters.viaticos_zonas[idx];
-      if (!v) return;
-      if (v.pasaje > 0) {
-        costeoRows['gastos_viaje'].push({ uid: 'v_' + Date.now() + '1', codigo: 'VUELO ' + v.ciudad, descripcion: `Pasaje Aéreo a ${v.ciudad} (${v.zona})`, detalle: v.ciudad, cantidad: 1, tecnicos: 1, valor: v.pasaje });
-      }
-      costeoRows['gastos_viaje'].push({ uid: 'v_' + Date.now() + '2', codigo: 'HOTEL ' + v.ciudad, descripcion: `Alojamiento Hotel en ${v.ciudad}`, detalle: 'Por noche', cantidad: 1, tecnicos: 1, valor: v.hotel });
-      costeoRows['gastos_viaje'].push({ uid: 'v_' + Date.now() + '3', codigo: 'ALIM ' + v.ciudad, descripcion: `Alimentación Diaria (${v.ciudad})`, detalle: 'Por día', cantidad: 1, tecnicos: 1, valor: v.alimentacion });
+      document.getElementById('calcCiudadSelect').value = idx;
+      actualizarPreviewCiudad();
+      aplicarViaticosCiudad();
       switchMainTab('cotizador');
-      renderCosteoSections();
-      showToast(`Viáticos de ${v.ciudad} añadidos al cotizador`);
     }
 
     function enviarRemotoACotizador(idx) {
       const s = masters.servicios_remotos[idx];
       if (!s) return;
-      costeoRows['hh_servicio'].push({
-        uid: 'rem_' + Date.now(),
-        codigo: 'HH SOFTWARE',
-        descripcion: 'HH SOFTWARE',
-        detalle: `${s.codigo}: ${s.descripcion}`,
-        cantidad: s.hh,
-        tecnicos: 1,
-        valor: 14400
-      });
-      switchMainTab('cotizador');
-      renderCosteoSections();
+      costeoRows['hh_servicio'].push({ uid: 'rem_' + Date.now(), codigo: 'HH SOFTWARE', descripcion: 'HH SOFTWARE', detalle: `${s.codigo}: ${s.descripcion}`, cantidad: s.hh, tecnicos: 1, valor: 14400 });
+      switchMainTab('cotizador'); renderCosteoSections();
       showToast(`Servicio remoto (${s.hh} HH) enviado al cotizador`);
     }
 
-    // =========================================================================
-    // 6. INTEGRACIÓN GOOGLE DRIVE & GOOGLE SHEETS (APPS SCRIPT)
-    // =========================================================================
-    const APPS_SCRIPT_TEMPLATE = `/**
- * CONECTOR GOOGLE DRIVE & SHEETS - SISTEMA COSTEO PILO CHILE
- * Desplegar como Aplicación Web -> Ejecutar como: Yo -> Acceso: Cualquier persona
- */
-function doPost(e) {
+    const APPS_SCRIPT_TEMPLATE = `function doPost(e) {
   try {
     var payload = JSON.parse(e.postData.contents);
     var action = payload.action;
     var folderId = extractFolderId(payload.folderId);
     var fileName = payload.fileName || 'BD_COSTEO_PILO_CHILE_2026';
-
     var ss = getOrCreateSpreadsheet(folderId, fileName);
 
     if (action === 'TEST_CONNECTION') {
-      return jsonResponse({
-        status: 'ok',
-        message: 'Conexión exitosa y base de datos lista en Google Drive.',
-        sheetUrl: ss.getUrl(),
-        sheetId: ss.getId()
-      });
+      return jsonResponse({ status: 'ok', message: 'Conexión exitosa y base de datos lista en Google Drive.', sheetUrl: ss.getUrl(), sheetId: ss.getId() });
     }
-
     if (action === 'SAVE_COSTEO') {
       var c = payload.data;
-      var sheet = getOrCreateSheet(ss, 'Historial_Costeos', [
-        'Fecha Registro', 'Fecha Cotización', 'ID Negocio', 'Cliente',
-        'Vendedor Interno', 'Vendedor Externo', 'Costo Total ($)',
-        'Margen (%)', 'Factor K', 'Utilidad ($)', 'Venta Total ($)',
-        'Valor UF', 'Venta Total (UF)', 'Detalle JSON'
-      ]);
-
-      sheet.appendRow([
-        new Date(),
-        c.fecha,
-        c.idNegocio,
-        c.cliente,
-        c.vendedorInterno,
-        c.vendedorExterno,
-        c.costoTotal,
-        c.margen,
-        c.kVenta,
-        c.utilidad,
-        c.ventaClp,
-        c.valorUf,
-        c.ventaUf,
-        JSON.stringify(c.items)
-      ]);
-
-      // Guardar desglose línea por línea
-      var sheetDet = getOrCreateSheet(ss, 'Detalle_Lineas', [
-        'Fecha Registro', 'ID Negocio', 'Cliente', 'Categoría',
-        'Código', 'Descripción', 'Detalle Servicio', 'Cantidad/Horas',
-        'Técnicos', 'Valor Unitario ($)', 'Subtotal ($)'
-      ]);
-
+      var sheet = getOrCreateSheet(ss, 'Historial_Costeos', ['Fecha Registro', 'Fecha Cotización', 'ID Negocio', 'Cliente', 'Vendedor Interno', 'Vendedor Externo', 'Costo Total ($)', 'Margen (%)', 'Factor K', 'Utilidad ($)', 'Venta Total ($)', 'Valor UF', 'Venta Total (UF)', 'Detalle JSON']);
+      sheet.appendRow([new Date(), c.fecha, c.idNegocio, c.cliente, c.vendedorInterno, c.vendedorExterno, c.costoTotal, c.margen, c.kVenta, c.utilidad, c.ventaClp, c.valorUf, c.ventaUf, JSON.stringify(c.items)]);
+      var sheetDet = getOrCreateSheet(ss, 'Detalle_Lineas', ['Fecha Registro', 'ID Negocio', 'Cliente', 'Categoría', 'Código', 'Descripción', 'Detalle Servicio', 'Cantidad/Horas', 'Técnicos', 'Valor Unitario ($)', 'Subtotal ($)']);
       if (c.items && c.items.length > 0) {
-        var rows = c.items.map(function(it) {
-          return [
-            new Date(), c.idNegocio, c.cliente, it.categoria,
-            it.codigo, it.descripcion, it.detalle || '',
-            it.cantidad, it.tecnicos, it.valorUnitario, it.total
-          ];
-        });
+        var rows = c.items.map(function(it) { return [new Date(), c.idNegocio, c.cliente, it.categoria, it.codigo, it.descripcion, it.detalle || '', it.cantidad, it.tecnicos, it.valorUnitario, it.total]; });
         sheetDet.getRange(sheetDet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
       }
-
-      return jsonResponse({
-        status: 'ok',
-        message: 'Costeo guardado correctamente en Google Sheets.',
-        sheetUrl: ss.getUrl()
-      });
+      return jsonResponse({ status: 'ok', message: 'Costeo guardado correctamente en Google Sheets.', sheetUrl: ss.getUrl() });
     }
-
     if (action === 'SYNC_MASTERS') {
-      var m = payload.masters;
       var sheetM = getOrCreateSheet(ss, 'Datos_Maestros', ['Última Sincronización', 'JSON Maestros']);
       sheetM.clearContents();
       sheetM.appendRow(['Última Sincronización', 'JSON Maestros']);
-      sheetM.appendRow([new Date(), JSON.stringify(m)]);
-      return jsonResponse({
-        status: 'ok',
-        message: 'Datos maestros respaldados en Google Sheets.',
-        sheetUrl: ss.getUrl()
-      });
+      sheetM.appendRow([new Date(), JSON.stringify(payload.masters)]);
+      return jsonResponse({ status: 'ok', message: 'Datos maestros respaldados en Google Sheets.', sheetUrl: ss.getUrl() });
     }
-
     return jsonResponse({ status: 'error', message: 'Acción no reconocida: ' + action });
   } catch (err) {
     return jsonResponse({ status: 'error', message: err.toString() });
   }
 }
-
 function doGet(e) {
   try {
     var folderId = extractFolderId(e.parameter.folderId);
@@ -1377,34 +1347,24 @@ function doGet(e) {
       var raw = sheetM.getRange(2, 2).getValue();
       if (raw) masters = JSON.parse(raw);
     }
-    return jsonResponse({
-      status: 'ok',
-      sheetUrl: ss.getUrl(),
-      masters: masters
-    });
+    return jsonResponse({ status: 'ok', sheetUrl: ss.getUrl(), masters: masters });
   } catch (err) {
     return jsonResponse({ status: 'error', message: err.toString() });
   }
 }
-
 function extractFolderId(input) {
   if (!input) return '';
-  var match = input.match(/[-\\w]{25,}/);
+  var match = input.match(/[-\w]{25,}/);
   return match ? match[0] : input.trim();
 }
-
 function getOrCreateSpreadsheet(folderId, fileName) {
   var folder = folderId ? DriveApp.getFolderById(folderId) : DriveApp.getRootFolder();
   var files = folder.getFilesByName(fileName);
-  if (files.hasNext()) {
-    return SpreadsheetApp.open(files.next());
-  }
+  if (files.hasNext()) return SpreadsheetApp.open(files.next());
   var ss = SpreadsheetApp.create(fileName);
-  var file = DriveApp.getFileById(ss.getId());
-  file.moveTo(folder);
+  DriveApp.getFileById(ss.getId()).moveTo(folder);
   return ss;
 }
-
 function getOrCreateSheet(ss, name, headers) {
   var sheet = ss.getSheetByName(name);
   if (!sheet) {
@@ -1415,10 +1375,8 @@ function getOrCreateSheet(ss, name, headers) {
   }
   return sheet;
 }
-
 function jsonResponse(obj) {
-  return ContentService.createTextOutput(JSON.stringify(obj))
-    .setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }`;
 
     function initDriveConfigUI() {
@@ -1433,7 +1391,6 @@ function jsonResponse(obj) {
       const dot = document.getElementById('driveStatusDot');
       const txt = document.getElementById('driveStatusText');
       const linkHist = document.getElementById('openSheetLinkHist');
-
       if (driveConfig.webAppUrl && driveConfig.folderId) {
         dot.className = 'w-2 h-2 rounded-full bg-emerald-400';
         txt.textContent = `Drive Conectado: ${driveConfig.sheetName}`;
@@ -1441,7 +1398,6 @@ function jsonResponse(obj) {
         dot.className = 'w-2 h-2 rounded-full bg-amber-400';
         txt.textContent = 'Google Sheets: Modo Local (Sin URL Script)';
       }
-
       if (driveConfig.lastSheetUrl) {
         linkHist.href = driveConfig.lastSheetUrl;
         linkHist.classList.remove('hidden');
@@ -1467,32 +1423,19 @@ function jsonResponse(obj) {
     async function probarConexionDrive() {
       guardarConfigDrive();
       const resBox = document.getElementById('driveTestResult');
-      if (!driveConfig.webAppUrl) {
-        return showToast('Ingresa la URL del Web App de Google Apps Script', 'error');
-      }
+      if (!driveConfig.webAppUrl) return showToast('Ingresa la URL del Web App de Google Apps Script', 'error');
       resBox.className = 'p-3 rounded-lg text-xs border bg-blue-50 border-blue-200 text-blue-800';
       resBox.textContent = 'Conectando con Google Drive y verificando hoja de cálculo...';
       resBox.classList.remove('hidden');
-
       try {
-        const resp = await fetch(driveConfig.webAppUrl, {
-          method: 'POST',
-          body: JSON.stringify({
-            action: 'TEST_CONNECTION',
-            folderId: driveConfig.folderId,
-            fileName: driveConfig.sheetName
-          })
-        });
-        const data = await resp.json();
+        const data = await callGoogleScriptPost({ action: 'TEST_CONNECTION', folderId: driveConfig.folderId, fileName: driveConfig.sheetName });
         if (data.status === 'ok') {
           driveConfig.lastSheetUrl = data.sheetUrl;
           localStorage.setItem('pilo_drive_cfg_v1', JSON.stringify(driveConfig));
           updateDriveStatusBadge();
           resBox.className = 'p-3 rounded-lg text-xs border bg-emerald-50 border-emerald-200 text-emerald-800';
           resBox.innerHTML = `<strong>¡Éxito!</strong> ${data.message} <br><a href="${data.sheetUrl}" target="_blank" class="underline font-bold mt-1 inline-block">Abrir Hoja de Cálculo en Google Drive &rarr;</a>`;
-        } else {
-          throw new Error(data.message);
-        }
+        } else throw new Error(data.message);
       } catch (err) {
         resBox.className = 'p-3 rounded-lg text-xs border bg-rose-50 border-rose-200 text-rose-800';
         resBox.textContent = 'Error de conexión: ' + err.message;
@@ -1500,33 +1443,17 @@ function jsonResponse(obj) {
     }
 
     async function sincronizarMaestrosSheets() {
-      if (!driveConfig.webAppUrl) {
-        switchMainTab('config');
-        return showToast('Configura primero la URL de Google Apps Script', 'error');
-      }
+      if (!driveConfig.webAppUrl) { switchMainTab('config'); return showToast('Configura primero la URL de Google Apps Script', 'error'); }
       showToast('Sincronizando maestros con Google Sheets...');
       try {
-        const resp = await fetch(driveConfig.webAppUrl, {
-          method: 'POST',
-          body: JSON.stringify({
-            action: 'SYNC_MASTERS',
-            folderId: driveConfig.folderId,
-            fileName: driveConfig.sheetName,
-            masters: masters
-          })
-        });
-        const data = await resp.json();
+        const data = await callGoogleScriptPost({ action: 'SYNC_MASTERS', folderId: driveConfig.folderId, fileName: driveConfig.sheetName, masters: masters });
         if (data.status === 'ok') {
           driveConfig.lastSheetUrl = data.sheetUrl;
           localStorage.setItem('pilo_drive_cfg_v1', JSON.stringify(driveConfig));
           updateDriveStatusBadge();
           showToast('Datos maestros respaldados en Google Sheets');
-        } else {
-          throw new Error(data.message);
-        }
-      } catch (err) {
-        showToast('Error al sincronizar: ' + err.message, 'error');
-      }
+        } else throw new Error(data.message);
+      } catch (err) { showToast('Error al sincronizar: ' + err.message, 'error'); }
     }
 
     async function cargarMaestrosDesdeSheets() {
@@ -1535,128 +1462,60 @@ function jsonResponse(obj) {
       showToast('Descargando maestros desde Google Sheets...');
       try {
         const url = `${driveConfig.webAppUrl}?folderId=${encodeURIComponent(driveConfig.folderId)}&fileName=${encodeURIComponent(driveConfig.sheetName)}`;
-        const resp = await fetch(url);
+        const resp = await fetch(url, { redirect: 'follow' });
         const data = await resp.json();
         if (data.status === 'ok' && data.masters) {
-          masters = data.masters;
-          saveMastersLocal();
-          populateVendedoresSelects();
-          renderMasterEditor();
-          renderCosteoSections();
+          masters = data.masters; saveMastersLocal(); populateVendedoresSelects(); populateCiudadesSelector(); renderMasterEditor(); renderCosteoSections();
           showToast('Maestros importados desde Google Sheets');
-        } else {
-          showToast('No se encontraron maestros previos en la hoja', 'error');
-        }
-      } catch (err) {
-        showToast('Error al importar: ' + err.message, 'error');
-      }
+        } else showToast('No se encontraron maestros previos en la hoja', 'error');
+      } catch (err) { showToast('Error al importar: ' + err.message, 'error'); }
     }
 
-    // =========================================================================
-    // 7. GUARDAR COSTEO, HISTORIAL Y EXPORTACIÓN CSV
-    // =========================================================================
     async function guardarCosteoCompleto() {
       const calc = recalcularTodo();
       const idNegocio = document.getElementById('cotIdNegocio').value.trim() || 'SIN-ID-' + Date.now().toString().slice(-4);
       const cliente = document.getElementById('cotCliente').value.trim() || 'CLIENTE GENERAL';
-
       const itemsActivos = [];
       COSTEO_SECTIONS.forEach(sec => {
         (costeoRows[sec.id] || []).forEach(r => {
           const total = (parseFloat(r.cantidad) || 0) * (parseFloat(r.tecnicos) || 0) * (parseFloat(r.valor) || 0);
           if (total > 0 || (parseFloat(r.cantidad) || 0) > 0) {
-            itemsActivos.push({
-              categoria: sec.title,
-              codigo: r.codigo,
-              descripcion: r.descripcion,
-              detalle: r.detalle,
-              cantidad: r.cantidad,
-              tecnicos: r.tecnicos,
-              valorUnitario: r.valor,
-              total: total
-            });
+            itemsActivos.push({ categoria: sec.title, codigo: r.codigo, descripcion: r.descripcion, detalle: r.detalle, cantidad: r.cantidad, tecnicos: r.tecnicos, valorUnitario: r.valor, total: total });
           }
         });
       });
 
       const registro = {
-        id: Date.now(),
-        fecha: document.getElementById('cotFecha').value,
-        idNegocio,
-        cliente,
-        vendedorInterno: document.getElementById('cotVendedorInterno').value,
-        vendedorExterno: document.getElementById('cotVendedorExterno').value,
-        costoTotal: calc.costoTotalGeneral,
-        margen: calc.margenPct,
-        kVenta: calc.kVenta,
-        utilidad: calc.utilidad,
-        ventaClp: calc.ventaClp,
-        valorUf: calc.valorUf,
-        ventaUf: calc.ventaUf,
-        items: itemsActivos,
-        rawSections: JSON.parse(JSON.stringify(costeoRows))
+        id: Date.now(), fecha: document.getElementById('cotFecha').value, idNegocio, cliente,
+        vendedorInterno: document.getElementById('cotVendedorInterno').value, vendedorExterno: document.getElementById('cotVendedorExterno').value,
+        costoTotal: calc.costoTotalGeneral, margen: calc.margenPct, kVenta: calc.kVenta, utilidad: calc.utilidad, ventaClp: calc.ventaClp, valorUf: calc.valorUf, ventaUf: calc.ventaUf,
+        items: itemsActivos, rawSections: JSON.parse(JSON.stringify(costeoRows))
       };
 
-      historial.unshift(registro);
-      saveHistorialLocal();
-      renderHistorial();
+      historial.unshift(registro); saveHistorialLocal(); renderHistorial();
 
       if (driveConfig.webAppUrl) {
         showToast('Enviando costeo a Google Sheets...');
         try {
-          const resp = await fetch(driveConfig.webAppUrl, {
-            method: 'POST',
-            body: JSON.stringify({
-              action: 'SAVE_COSTEO',
-              folderId: driveConfig.folderId,
-              fileName: driveConfig.sheetName,
-              data: registro
-            })
-          });
-          const data = await resp.json();
+          const data = await callGoogleScriptPost({ action: 'SAVE_COSTEO', folderId: driveConfig.folderId, fileName: driveConfig.sheetName, data: registro });
           if (data.status === 'ok') {
             driveConfig.lastSheetUrl = data.sheetUrl;
             localStorage.setItem('pilo_drive_cfg_v1', JSON.stringify(driveConfig));
             updateDriveStatusBadge();
             showToast('¡Costeo guardado en Google Sheets y en historial local!');
-          } else {
-            throw new Error(data.message);
-          }
-        } catch (err) {
-          showToast('Guardado local OK, pero falló envío a Sheets: ' + err.message, 'error');
-        }
-      } else {
-        showToast('Costeo guardado en historial local (Configura Drive para envío en la nube)');
-      }
+          } else throw new Error(data.message);
+        } catch (err) { showToast('Guardado local OK, pero falló envío a Sheets: ' + err.message, 'error'); }
+      } else showToast('Costeo guardado en historial local (Configura Drive para envío en la nube)');
     }
 
     function renderHistorial() {
       const tbody = document.getElementById('historialTbody');
-      if (historial.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="9" class="p-6 text-center text-slate-400">Aún no hay costeos guardados.</td></tr>`;
-        return;
-      }
-      tbody.innerHTML = historial.map((h, idx) => `
-        <tr class="hover:bg-slate-50">
-          <td class="p-2.5">${h.fecha}</td>
-          <td class="p-2.5 font-bold text-blue-700">${h.idNegocio}</td>
-          <td class="p-2.5 font-medium">${h.cliente}</td>
-          <td class="p-2.5 text-slate-500">${h.vendedorInterno}</td>
-          <td class="p-2.5 num-right">${fmtCLP(h.costoTotal)}</td>
-          <td class="p-2.5 num-right">${h.margen}%</td>
-          <td class="p-2.5 num-right font-bold text-slate-900">${fmtCLP(h.ventaClp)}</td>
-          <td class="p-2.5 num-right font-bold text-emerald-700">${fmtUF(h.ventaUf)}</td>
-          <td class="p-2.5 text-center">
-            <button onclick="cargarDesdeHistorial(${idx})" title="Cargar en cotizador" class="text-blue-600 hover:text-blue-800 mr-2"><i class="fa-solid fa-folder-open"></i></button>
-            <button onclick="eliminarHistorial(${idx})" title="Eliminar" class="text-rose-500 hover:text-rose-700"><i class="fa-solid fa-trash"></i></button>
-          </td>
-        </tr>
-      `).join('');
+      if (historial.length === 0) { tbody.innerHTML = `<tr><td colspan="9" class="p-6 text-center text-slate-400">Aún no hay costeos guardados.</td></tr>`; return; }
+      tbody.innerHTML = historial.map((h, idx) => `<tr class="hover:bg-slate-50"><td class="p-2.5">${h.fecha}</td><td class="p-2.5 font-bold text-blue-700">${h.idNegocio}</td><td class="p-2.5 font-medium">${h.cliente}</td><td class="p-2.5 text-slate-500">${h.vendedorInterno}</td><td class="p-2.5 num-right">${fmtCLP(h.costoTotal)}</td><td class="p-2.5 num-right">${h.margen}%</td><td class="p-2.5 num-right font-bold text-slate-900">${fmtCLP(h.ventaClp)}</td><td class="p-2.5 num-right font-bold text-emerald-700">${fmtUF(h.ventaUf)}</td><td class="p-2.5 text-center"><button onclick="cargarDesdeHistorial(${idx})" title="Cargar en cotizador" class="text-blue-600 hover:text-blue-800 mr-2"><i class="fa-solid fa-folder-open"></i></button><button onclick="eliminarHistorial(${idx})" title="Eliminar" class="text-rose-500 hover:text-rose-700"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');
     }
 
     function cargarDesdeHistorial(idx) {
-      const h = historial[idx];
-      if (!h) return;
+      const h = historial[idx]; if (!h) return;
       document.getElementById('cotFecha').value = h.fecha;
       document.getElementById('cotIdNegocio').value = h.idNegocio;
       document.getElementById('cotCliente').value = h.cliente;
@@ -1664,53 +1523,30 @@ function jsonResponse(obj) {
       document.getElementById('cotVendedorExterno').value = h.vendedorExterno;
       document.getElementById('comMargen').value = h.margen;
       document.getElementById('comValorUf').value = h.valorUf;
-      if (h.rawSections) {
-        costeoRows = JSON.parse(JSON.stringify(h.rawSections));
-      }
-      switchMainTab('cotizador');
-      renderCosteoSections();
+      if (h.rawSections) costeoRows = JSON.parse(JSON.stringify(h.rawSections));
+      switchMainTab('cotizador'); renderCosteoSections();
       showToast(`Costeo ${h.idNegocio} cargado en pantalla`);
     }
 
-    function eliminarHistorial(idx) {
-      historial.splice(idx, 1);
-      saveHistorialLocal();
-      renderHistorial();
-    }
+    function eliminarHistorial(idx) { historial.splice(idx, 1); saveHistorialLocal(); renderHistorial(); }
 
     function exportCosteoCSV() {
       const calc = recalcularTodo();
       const idNeg = document.getElementById('cotIdNegocio').value || 'COSTEO';
       const cli = document.getElementById('cotCliente').value || 'CLIENTE';
       let csv = 'SECCION;CODIGO;DESCRIPCION;DETALLE;CANTIDAD;TECNICOS;VALOR_UNITARIO;TOTAL_CLP\n';
-
       COSTEO_SECTIONS.forEach(sec => {
         (costeoRows[sec.id] || []).forEach(r => {
           const tot = (parseFloat(r.cantidad) || 0) * (parseFloat(r.tecnicos) || 0) * (parseFloat(r.valor) || 0);
-          if (tot > 0) {
-            csv += `"${sec.title}";"${r.codigo}";"${r.descripcion}";"${r.detalle}";${r.cantidad};${r.tecnicos};${r.valor};${tot}\n`;
-          }
+          if (tot > 0) csv += `"${sec.title}";"${r.codigo}";"${r.descripcion}";"${r.detalle}";${r.cantidad};${r.tecnicos};${r.valor};${tot}\n`;
         });
       });
-
-      csv += `\n;;;;;;COSTO TOTAL ($);${calc.costoTotalGeneral}\n`;
-      csv += `;;;;;;MARGEN (%);${calc.margenPct}%\n`;
-      csv += `;;;;;;K DE VENTA;${calc.kVenta.toFixed(4)}\n`;
-      csv += `;;;;;;UTILIDAD ($);${Math.round(calc.utilidad)}\n`;
-      csv += `;;;;;;VALOR VENTA ($);${Math.round(calc.ventaClp)}\n`;
-      csv += `;;;;;;VALOR VENTA (UF);${calc.ventaUf.toFixed(2)}\n`;
-
+      csv += `\n;;;;;;COSTO TOTAL ($);${calc.costoTotalGeneral}\n;;;;;;MARGEN (%);${calc.margenPct}%\n;;;;;;K DE VENTA;${calc.kVenta.toFixed(4)}\n;;;;;;UTILIDAD ($);${Math.round(calc.utilidad)}\n;;;;;;VALOR VENTA ($);${Math.round(calc.ventaClp)}\n;;;;;;VALOR VENTA (UF);${calc.ventaUf.toFixed(2)}\n`;
       const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Costeo_${idNeg}_${cli.replace(/\s+/g, '_')}.csv`;
-      a.click();
+      const a = document.createElement('a'); a.href = url; a.download = `Costeo_${idNeg}_${cli.replace(/\s+/g, '_')}.csv`; a.click();
     }
 
-    // =========================================================================
-    // 8. NAVEGACIÓN DE PESTAÑAS E INICIO
-    // =========================================================================
     function switchMainTab(tabName) {
       ['cotizador', 'maestros', 'historial', 'config'].forEach(t => {
         document.getElementById(`tab-${t}`).classList.add('hidden');
@@ -1723,6 +1559,7 @@ function jsonResponse(obj) {
     window.addEventListener('DOMContentLoaded', () => {
       document.getElementById('cotFecha').valueAsDate = new Date();
       populateVendedoresSelects();
+      populateCiudadesSelector();
       initCosteoRows();
       renderCosteoSections();
       renderMasterEditor();
